@@ -51,7 +51,7 @@
 
 ​	直接内存并不是 JVM 运行时数据区域的一部分，但也会被频繁的使用：在 JDK 1.4 引入的 NIO 提供了基于 Channel 与 Buffer 的 IO 方式，它可以使用 Native 函数库直接分配堆外内存，然后使用 DirectByteBuffer 对象作为这块内存的引用进行操作(详见：Java I/O 扩展)，这样就避免了再 Java 堆和 Native 堆中来回复制数据，因此在一些场景中可以显著提高性能。
 
-
+![Java-Memory-Area](./assets/jvm/Java-Memory-Area.png)
 
 
 
@@ -73,3 +73,8 @@
 
 ### 2.2.3.本地方法区 (线程私有)
 
+​	本地方法区和 Java Stack 作用类型，区别是虚拟机栈作为执行 Java 方法服务，而本地方法栈为 Native 方法服务，如果一个 VM 实现适用 C-linkage 模型来支持 Native 调用，那么该栈将会是一个 C 栈，但 HotSpot VM 直接就把本地方法栈和虚拟机栈合二为一。
+
+### 2.2.4. 堆 (Heap-线程共享) -运行时数据区
+
+​	堆是被线程共享的一块内存区域，创建的对象和数组都保存在 Java 堆内存中，也就是垃圾收集器进行垃圾收集的最重要的内存区域。由于现代 VM 采用分代收集算法，因此 Java 堆从 GC 的角度还可以细分为：**新生代**(Eden 区、From Survivor 区和 To Survivor区)
