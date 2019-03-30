@@ -87,3 +87,4 @@
 
 ## 2.3.JVM运行时内存
 
+​	Java 堆从 GC 的角度还可以细分为：**新生代** (Eden区、From Survivor 区和 To Survivor 区) 和**老年代**。
