@@ -111,3 +111,28 @@
 
 ​	MinorGC 采用复制算法。
 
+**①：eden、servivorFrom 复制到 ServicorTo，年龄+1**
+
+​	首先，把 Eden 和 ServivorFrom 区域中存活的对象复制到 ServicorTo 区域 (如果有对象的年龄以及达到了老年的标准，则复制到老年代区)，同时把这些对象的年龄+1 (如果 ServicorTo 不够位置了就放到老年区)；
+
+**②：清空 eden、servicorFrom**
+
+​	然后，清空 Eden 和 ServicorFrom 中的对象；
+
+**③：ServicorTo 和 ServicorFrom 互换**
+
+​	最后，ServicorTo 和 ServicorFrom 互换，源 ServicorTo 成为下一次 GC 时的 ServicorFrom区。
+
+
+
+### 2.3.2. 老年代
+
+​	主要存放在应用程序中生命周期长的内存对象。
+
+​	老年代的对象比较稳定，所以 MajorGC 不会频繁执行。在进行 MajorGC 前一般都先进行了 MinorGC，使得有新生代的对象晋升入老年代，导致空间不够用时才触发。当无法找到足够大的连续空间分配给所创建的较大对象时也会提前触发一次 MajorGC 进行垃圾回收腾出空间。
+
+​	MajorGC 采用标记清除法：首先扫描一次所有老年代，标记出存活的对象，然后回收没有标记的对象。MajorGC 的耗时比较长，因为要扫描在回收。MajorGC 会产生内存碎片，为了减少内存消耗，我们一般需要进行合并或者标记出来方便下次直接分配。当老年代也满了装不下的时候，就会抛出 OOM (Out Of Memory) 异常。
+
+### 2.3.3. 永久代
+
+​	永久代是指内存的永久保存区域，主要存放 Class 和 Meta (元数据) 的信息，Class 在被加载的时候被放入永久区域，它和存放示例的区域不同，GC 不会再主程序运行期对永久区域进行清理。所以这也导致了永久代的区域会随着加载的 Class 的增多而膨胀，最终抛出 OOM 异常。
