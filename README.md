@@ -478,7 +478,7 @@ NIO 中的 Channel 的主要实现有：
 ​	准备阶段是正式为类变量分配内存并设置类变量的初始值阶段，即在方法区中分配这些变量所使用的内存空间。注意这里说的初始值概念，比如一个类变量定义为：
 
 ```java
-public static int v = 8080
+public static int v = 8080;
 ```
 
 ​	实际上变量 v 在准备阶段过后的初始值为 0 而不是 8080，将 v 赋值为 8080 的 put static 指令是程序被编译后，存放于类构造器 <client> 方法中。
@@ -674,3 +674,68 @@ public static final int v = 8080;
 
 **Java7 HashMap 结构**
 
+
+
+
+
+
+
+​	大方向上，HashMap 里面是一个数组，然后数组中每个元素是一个单向链表。上图中，每个绿色的实体是嵌套类 Entry 的实例，Entry 包含四个属性：key，value，hash 值和用于单向链表的 next。
+
+1. capacity：当前数组容量，始终保持在 2^n，可以扩容，扩容后数组大小为当前的 2 倍。
+2. loadFactor：负载因子，默认为 0.75.
+3. threshold：扩容的阈值，等于 capacity*loadFactor.
+
+
+
+#### 3.4.1.2. JAVA8 实现
+
+​	Java8 对 HashMap 进行了一些修改，最大的不同就是利用了红黑树，所以其由数组+链表+红黑树组成。
+
+​	根据 Java7 HashMap 的介绍，我们知道，查找的时候，根据 hash 值我们能够快速的定位到数组的具体下标，但是之后的话，需要顺着链表一个个比较下去才能找到我们需要的，时间复杂度取决于链表的长度，为 O(n)。为了降低这部分的开销，在 Java8 中，当链表中的元素超过了 8 个以后，会将链表转换为红黑树，在这些位置进行查找的时候可以降低时间复杂度为 O(logn)。
+
+**Java8 HashMap 结构**
+
+
+
+
+
+
+
+### 3.4.2. ConcurrentHashMap
+
+#### 3.4.2.1. Segment 段
+
+​	ConcurrentHashMap 和 HashMap 思路差不多，当是因为它支持并发操作，所以要复杂一些。整个 ConcurrentHashMap 由一个个 Segment 组成，Segment 代表"部分"或"一段"的意思，所以很多地方将其描述为分段锁。注意，行文中，我很多地方用了"槽"来代表一个 segment。
+
+#### 3.4.2.2. 线程安全 (Segment 继承 ReentrantLock)
+
+​	简单理解就是，ConcurrentHashMap 是一个 Segment 数组，Segment 通过继承 ReentrantLock 来进行加锁，所以每次需要加锁的操作锁住的是一个 Segment，这样只要保证每个 Segment 是线程安全的，也就实现了全局的线程安全。
+
+**Java7 ConcurrentHashMap**
+
+
+
+
+
+
+
+#### 3.4.2.3. 并行度 (默认16)
+
+​	concurrentLevel: 并行级别、并发数、Segment数，怎么翻译不重要，理解它。默认是16，也就是说 ConcurrentHashMap 有 16 个 Segment，所以理论上，这个时候，最多可以同时支持 16 个线程并发，只要它们分别分布在不同的 Segment 上。这个值可以在初始化的时候设置为其他值，但是一旦初始化后，它是不可以扩容的。在具体到每个 Segment 内部，其实每个 Segment 很像之间介绍的 HashMap，不过它要保证线程安全，所以处理起来要麻烦些。
+
+#### 3.4.2.4. Java8 实现 (引入了红黑树)
+
+​	Java8 对 ConcurrentHashMap 进行了比较大的改动，Java8 也引入了红黑树。
+
+**Java8 ConcurrentHashMap 结构**
+
+
+
+
+
+
+
+### 3.4.3. HashTable (线程安全)
+
+​	
