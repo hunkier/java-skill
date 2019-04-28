@@ -738,4 +738,4 @@ public static final int v = 8080;
 
 ### 3.4.3. HashTable (线程安全)
 
-​	
+​	Hashtable 遗留类，很多映射的常用功能与 HashMap 类似，不同的是它继承自 Dictionary 类，并且是线程安全的，任一时间只有一个线程能写 HashTable，并发性不如 ConcurrentHashMap，因为 ConcurrentHashMap 引入了分段锁。HashTable 不建议在新代码中使用，不需要线程安全的场合可以用 HashMap 替换，需要线程安全的场合可以用 ConcurrentHashMap 替换。
