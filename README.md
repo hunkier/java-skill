@@ -739,3 +739,45 @@ public static final int v = 8080;
 ### 3.4.3. HashTable (线程安全)
 
 ​	Hashtable 遗留类，很多映射的常用功能与 HashMap 类似，不同的是它继承自 Dictionary 类，并且是线程安全的，任一时间只有一个线程能写 HashTable，并发性不如 ConcurrentHashMap，因为 ConcurrentHashMap 引入了分段锁。HashTable 不建议在新代码中使用，不需要线程安全的场合可以用 HashMap 替换，需要线程安全的场合可以用 ConcurrentHashMap 替换。
+
+### 3.4.4. TreeMap (可排序)
+
+​	TreeMap 实现 SortedMap 接口，能够把它保存的记录根据键排序，默认是按值的升序排序，也可以指定排序的比较器，当用 Iterator 遍历 TreeMap 时，得到的记录是排过序的。
+
+​	如果使用排序的映射，建议使用 TreeMap。
+
+​	在使用 TreeMap 时，key 必须实现 Comparable 接口或者在构造 TreeMap 传入自定义的 Comparator，否则会在运行时抛出 java.lang.ClassCastException 类型异常。
+
+### 3.4.5. LinkHashMap (记录插入顺序)
+
+​	LinkedHashMap 是 HashMap 的一个子类，保存了记录的插入顺序，在用 Iterator 遍历 LinkedHashMap 时，先得到的记录肯定是先插入，也可以在构造时带参数，按照访问次序排序。
+
+
+
+# 4. Java 多线程并发
+
+### 4.1.1.  Java 并发知识库
+
+
+
+
+
+
+
+### 4.1.2. Java 线程实现/创建方式
+
+#### 4.1.2.1. 继承 Thread 类
+
+​	Thread 类本质上是实现了 Runnable 接口的一个实例。启动线程的唯一方法就是通过 Thread 类的 start() 实例方法。start() 方法是一个 native 方法，它将启动一个新线程，并执行 run() 方法。
+
+```java
+public class MyThread extends Thread {
+		public void run() {
+				System.out.println("MyThread.run()");
+		}
+}
+MyThread myThread1 = new MyThread();
+myThread1.start();
+
+```
+
