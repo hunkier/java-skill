@@ -781,3 +781,111 @@ myThread1.start();
 
 ```
 
+#### 4.1.2.2. 实现 Runnable 接口
+
+​	如果自己的类已经 extends 另外一个类，就无法直接 extends Thread，此时实现一个 Runnable 接口。
+
+```java
+public 	class MyThread extends OtherClass Implements Runnable {
+  public void run() {
+    System.out.println("MyThread.run()");
+  }
+}
+// 启动一个 MyThread，需要先实例化一个 Thread，并传入自己的 MyThread 实例：
+MyThread mythread = new MyThread();
+Thread thread = new Thread(myThread);
+thread.start();
+// 事实上，当传入一个 Runnable target 参数给 Thread 后，Thread 的 run() 方法就会调用 target.run()
+public void run() {
+  if (target != null ){
+    target.run();
+  }
+}
+```
+
+#### 4.1.2.3. ExecutorService、Callable<Class>、Future 有返回值线程
+
+​	有返回值的任务必须实现 Callable 接口，类似的，无返回值的任务必须 Runnable 接口。执行 Callable 任务后，可以获取一个 Future 的对象，在该对象上调用 get 就可以获取到 Callable 任务返回的 Object 了，再结合 ExcutorService 就可以实现传说中有返回结果的多线程了。
+
+```java
+public class MyCallable implements Callable<Object> {
+  Object call() throws Exception{
+    // 处理业务逻辑 TODO
+    Object obj = new Object();
+    // 返回处理结果
+    return obj;  
+  }
+}
+
+
+// 创建一个线程
+ExecutorService pool = Executors.newFixedThreadPool(taskSize);
+// 创建多个有返回值的任务
+List<Future> list = new ArrayList<Futrue>();
+for(int i = 0 ; i < taskSize; i++){
+  Callable c = new MyCallable(i+"");
+  // 执行任务并获取 Future 对象
+  Future f = pool.submit(c);
+  list.add(f);
+}
+// 关闭线程池
+pool.shutdown();
+// 获取所有并发任务的运行结果
+for (Future f : list) {
+  // 从 Future 对象上获取任务的返回值，并输出到控制台
+  System.out.println("res: " + f.get().toString());
+}
+```
+
+
+
+### 4.1.3. 4 种线程池
+
+​	Java 里面线程池的顶级接口是 Executor，当是严格意义上讲 Executor 并不是一个线程池，而是一个执行线程的工具。真正的线程池接口是 **ExecuteService**。
+
+
+
+
+
+
+
+
+
+#### 4.1.3.1. newCachedThreadPool
+
+​	创建一个可根据需要创建新线程的线程池，但是在以后构造的线程可用时将重用它们。对于执行很多短期异步任务的程序而言，这些线程池通常可提高程序的性能。调用 execute 将重用以前构造的线程 (如果线程可用)。如果现在线程没有可用的，则创建一个新线程并添加到池中。终止并从缓存中移除那些已有 60 秒钟未被使用的线程。因此，长时间保持空闲的线程池不会使用任务资源。
+
+
+
+#### 4.1.3.2. newFixThreadPool
+
+​	创建一个可重用固定线程数的线程池，以共享的无界队列方式来运行这些线程。在任意点，在大多数 Threads 线程会处于处理任务的活动状态。如果在所有线程处于活动状态时提交附加任务，则在有可用线程之前，附加任务将在队列中等待。如果在关闭前的执行期间由于失败而导致任何线程终止，那么一个新线程将代替它执行后续的任务 (如果需要)。在某个线程被显式地关闭之前，池中的线程将一直存在。
+
+#### 4.1.3.3.  newScheduledThreadPool
+
+​	创建一个线程池，它可安排在给定延迟后运行命令或者定期地执行
+
+```java
+ScheduledExecutorService scheduledThreadPool = Executors.newScheduledThreadPool(3);
+scheduledThreadPool.schedule(new Runnable(){
+  @Override
+  public void run() {
+    System.out.println("延迟三秒！");
+  }
+}, 3, TimeUnit.SECONDS);
+
+scheduledThreadPool.scheduleAtFixedRate(new Runnable(){
+  @Override
+  public void run(){
+    System.out.println("延迟1秒后每三秒执行一次！");
+  }
+}, 1, 3, TimeUnit.SECONDS);
+```
+
+#### 4.1.3.4. newSingleThreadExecutor
+
+​	Executors.newSingleThreadExecutor() 返回一个线程池 (这个线程池只有一个线程)，这个线程池可以在线程死后 (或发生异常时) 重新启动一个线程来替代原来的线程继续执行下去！
+
+### 4.1.4. 线程生命周期(状态)
+
+​	当线程被创建并启动以后，它既不是一启动就进入执行状态，也不是一直处于执行状态。在线程的生命周期中，它要经过新建 (New)、就绪 (Runnable)、运行 (Running)、阻塞 (Blocked) 和死亡 (Dead) 5中状态。尤其是当多线程启动以后，它不可能一直 "霸占" 着 CPU 独自运行，所以 CPU 需要在多条线程之间切换，于是线程状态也会多次在运行、阻塞之间切换。
