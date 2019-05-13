@@ -928,4 +928,79 @@ scheduledThreadPool.scheduleAtFixedRate(new Runnable(){
 
 1. run() 或 call() 方法执行完成，线程正常结束。
 
-   异常结束
+**异常结束**
+
+2. 线程抛出一个未捕获的 Exception 或 Error。
+
+**调用 stop**
+
+3. 直接调用该线程的 stop() 方法来结束该线程——该方法容易导致死锁，不推荐使用。
+
+
+
+
+
+
+
+
+
+### 4.1.5. 终止线程4中方式
+
+#### 4.1.5.1. 正常运行结束
+
+​	程序运行结束，线程自动结束。
+
+#### 4.1.5.2. 使用退出标志退出线程
+
+​	一般 run() 方法执行完，线程就会正常结束，然而，常常有一些线程是私服线程。它们需要长时间的运行，只有在外部某些条件满足的情况下，才能关闭这些线程。使用一个变量来控制循环，例如：最直接的方法就是设置一个 Boolean 类型标志，并通过设置这个标志为 true 或 false 来控制 while 循环是否退出，代码示例：
+
+```java
+public class ThreadSafe extends Thread {
+  public volatile boolean exit = false;
+  public void run() {
+    while(!exit){
+      // do something
+      
+    }
+  }
+}
+```
+
+定义了一个退出标志 exit，当 exit 为 true 时，while 循环退出，exit 的默认值为 false。在定义 exit时，使用了一个 Java 关键字 volatile，这个关键字的目的是使 exit 同步，也就是说在同一时刻只能由一个线程来修改 exit 的值。
+
+
+
+#### 4.1.5.3. Interrupt 方法结束线程
+
+​	使用 interrupt() 方法来中断线程有两种情况：
+
+1. 线程处于阻塞状态：如使用了 sleep，同步锁的 wait，socket 中的 receiver，accept 等方法时，会使线程处于阻塞状态。当调用线程的 interrupt() 方法时，会抛出 InterruptException 异常。阻塞中的那个方法抛出这个异常，通过代码捕获该异常，然后 break 跳出循环状态，从而让我们有机会结束这个线程的执行。通常很多人认为只要调用 interrupt 方法线程就会结束，实际上是错的，一定要先捕获 InterruputedException 异常之后通过 break 来跳出循环，才能正常结束 run 方法。
+
+2. 线程未处于阻塞状态：使用 isInterrupted() 判断线程的中断标志来退出循环。当使用 interrupt() 方法时，中断标志就会置true，和使用自定义的标志来控制循环是一样的道理。
+
+   ```java
+   public class ThreadSafe extends Thread {
+     public void run() {
+       while (!isInterrupted()){// 非阻塞过程通过判断中断标志来退出
+         try{
+           Thread.sleep(5*1000);// 阻塞过程捕获中断异常来退出
+         }catch(InterruptedException e){
+           e.printStackTrace();
+           break;// 捕获到异常之后，执行 break 跳出循环
+         }
+       }
+     }
+   }
+   ```
+
+   #### 4.1.5.4. stop 方法终止线程 (线程不安全)
+
+   ​	程序中可以直接使用 thread.stop() 来强行终止线程，但是 stop 方法是很危险的，就象突然关闭计算机电源，而不是按正常程序关机一样，可能会产生不可预料的结果，不安全主要是：thread.stop() 调用之后，创建子线程的线程会抛出 ThreadDeatherror 的错误，并且会释放子线程持有的所有锁。一般任何进行加锁的代码块，都是为了保护数据的一致性，如果在调用 thread.stop() 后导致了该线程所持有的所有锁突然释放(不可控制)，那么被保护数据就有可能呈现不一致，其他线程在使用这些被破坏的数据时，有可能导致一些很奇怪的应用程序错误。因此，并不推荐使用 stop 方法来终止线程。
+
+   ### 4.1.6. sleep 和 wait 区别
+
+   1. 对于 sleep() 方法，我们首先要知道该方法是属于 Thread 类中的。而 wait() 方法，则是属于 Object 类中的。
+   2. sleep() 方法导致了程序暂停执行指定的时间，让出 cpu 给其他线程，但是它的监控状态依然保持着，当指定的时间到了又会恢复运行状态。
+   3. 在调用 sleep() 方法过程中，线程不会释放对象锁。
+   4. 而当调用 wait() 方法的时候，线程会放弃对象锁，进入等待此对象的等待锁定池，只有针对此对象调用 notify() 方法后本线程才进入对象锁进入运行状态。
+
