@@ -1101,4 +1101,90 @@ Synchronized 核心组件
 1. JVM 每次从队列尾部取出一个数据用于竞争候选者 (OnDeck)，当是并发情况下，ContentionList 会被大量的并发线程进行 CAS 访问，为了降低对尾部元素的竞争，JVM 会将一部分线程移动到 EntryList 中作为候选竞争线程。
 2. Owner 线程会在 unlock 时，将 ContentionList 中的部分线程迁移到 EntryList 中，并指定 EntryList 中某个线程为 OnDeck 线程 (一般是最先进去的那个线程)。
 3. Owner 线程并不直接把锁传递给 OnDeck 线程，而是把锁竞争的权利交给 OnDeck，OnDeck 需要重新竞争锁。这样虽然牺牲了一些公平性，当是能极大的提升系统吞吐量，在 JVM 中，也把这种选择行为称之为 "竞争切换"。
-4. OnDeck 线程获取到锁资源后会变为 OnDeck 线程，而没有得到锁资源的仍然
+4. OnDeck 线程获取到锁资源后会变为 Owner 线程，而没有得到锁资源的仍然停留在 EntryList中。如果Owner线程被 wait 方法阻塞，则转移到 WaitSet 队列中，直到某个时刻通过 notify 或者 notifyAll 唤醒，会重新进入 EntryList中。
+5. 处于 ContentionList、EntryList、WaitSet 中的线程都处于阻塞状态，该阻塞是由操作系统来完成的 (Linux 内核下采用 pthread_mutex_lock 内核函数实现的 )。
+6. Synchronized 是非公平锁。Synchronized 在线程进入 ContentionList 时，等待的线程会先尝试自旋获取锁，如果获取不到就进入 ContentionList，这明显对于已经进入队列的线程是不公平的，还有一个不公平的事情就是自旋获取锁的线程还可能直接抢占 OnDeck 线程的锁资源。
+7. 每个对象都有个 monitor 对象，加锁就是在竞争 monitor 对象，代码块是在前后分别加上 monitorenter 和 moniterexit 指令来实现的，方法加锁是通过一个标记位来判断的。
+8. synchronized 是一个重量级操作，需要调用操作系统相关接口，性能是低效的有可能给线程加锁消耗的时间比有用操作消耗的时间更多。
+9. Java1.6 ，synchronized 进行了很多的优化，有适应自旋、锁消除、锁粗化、轻量级锁及偏向锁等，效率有了本质上的提高。在之后推出的 Java1.7 与 1.8 中，均对该关键字的实现机理做了优化。引入了偏向锁和轻量级锁。都是在对象头中有标记位，不需要经过操作系统加锁。
+10. 锁可以从偏向锁升级到轻量级锁，在升级到重量级锁。这种升级过程叫做锁膨胀；
+11. JDK1.6 中默认是开启偏向锁的轻量级锁，可以通过-XX:-UseBiasedLocking 来禁用偏向锁。
+
+#### 4.1.9.5. ReentrantLock
+
+​	ReentrantLock 继承接口 Lock 并实现了接口中定义的方法，他是一种可重入锁，除了能完成 synchronized 所能完成的所有工作外，还提供了诸如可响应中断锁、可轮询锁请求、定时锁等避免多线程死锁的方法。
+
+**Lock 接口的主要方法**
+
+1. void lock(): 执行此方法时，如果锁处于空闲状态，当前线程将获取到锁，相反，如果锁已经被其他线程持有，将禁用当前线程获取到锁。
+2. boolean tryLock(): 如果锁可用，则获取锁，并立刻返回 true，否则返回 false。该方法和 lock() 的区别在于，tryLock() 只是 "试图" 获取锁，如果锁不可用，不会导致当前线程被禁用，当前线程仍然继续往下执行代码。而 lock() 方法则是医药获取到锁，如果锁不可用，就一直在等待，在未获得锁之前，当前线程并不继续向下执行。
+3. void unlock(): 执行此方法时，当前线程将释放持有的锁。锁只能由持有者释放，如果线程并不持有锁，却执行该方法，可能导致异常的发生。
+4. Condition newCondition(): 条件对象，获取等待通知组件。该组件和当前的锁绑定，当前线程只有获取了锁，才能调用该组件的 await() 方法，而调用后，当前线程将释放锁。
+5. getHoldCount(): 查询当前线程保持此锁的次数，也就是执行此线程执行 lock 方法的次数。
+6. getQueueLength(): 返回正等待获取此锁的线程计数，比如启动10个线程，1个线程获取到锁，此时返回的是 9 。
+7. getWaitQueueLength: ( Condition condition ) 返回等待与此锁相关的给定条件的线程计数。比如 10 个线程，用同一个 condition 对象，并且此时这个 10 个线程都执行了 condition 对象的 await 方法，那么此时执行此方法返回 10 。
+8. hasWaiters( Condition condition ): 查询是否有线程等待与此锁有关的给定条件( condition )，对于指定 condition 对象，有多少线程执行了 condtion.await 方法。
+9. hasQueueThread( Thead thread ): 查询给定线程是否等待获取此锁。
+10. hasQueueThreads(): 是否有线程等待此锁。
+11. isFair(): 该锁是否公平锁。
+12. isHeldByCurrentThread(): 当前线程释放保持锁锁定，线程执行 lock 方法的前后分别是 false 和 true。
+13. isLock(): 此锁是否有任意线程占用。
+14. lockInterruptibly(): 如果当前线程未被中断，获取锁。
+15. tryLock(): 尝试获取锁，仅在调用时锁未被线程占用，获取锁。
+16. tryLock( long timeOut, TimeUnit unit): 如果锁在给定等待时间内没有被另一个线程保持，则获取该锁。
+
+**非公平锁**
+
+​	JVM 按随机、就近原则分配锁的机制则称为不公平锁，ReentrantLock 在构造函数中提供了是否公平锁的初始化方式，默认非公平锁。非公平锁实际执行效率要远远超出公平锁，除非程序有特殊需要，否则最常用非公平锁的分配机制。
+
+**公平锁**
+
+​	公平锁指的是锁的分配机制是公平的，通常先对锁提出获取请求的线程会先被分配到锁，ReentrantLock 在构造函数中提供了是否公平锁的初始化方式来定义公平锁。
+
+**ReentrantLock 与 synchronized**
+
+1. ReentrantLock 通过方法 lock() 与 unlock() 来进行加锁与解锁操作，与 synchronized 会被 JVM 自动解锁机制不同，ReentrantLock 加锁后需要手动进行解锁。为了避免程序出现异常而无法正常解锁的情况，使用ReentrantLock 必须在 finally 控制块中进行解锁操作。
+2. ReentrantLock 相比 synchronized 的优势是可中断、公平锁、多个锁。这种情况下需要使用 ReentrantLock。
+
+**ReentrantLock 实现**
+
+```java
+public class MyService {
+  private Lock lock = new ReentrantLock();
+  // Lock lock = new ReentrantLock(true);
+  // Lock lock = new ReentrantLock(false);
+  private Condition condition = lock.newCondition();// 创建 Condition
+  public void testMethod() {
+    try {
+      lock.lock();// lock 加锁
+      // 1: wait 方法等待
+      // System.out.println("开始 wait ");
+      condition.await();
+      // 通过创建 Condition 对象来是线程 wait，必须先执行 lock.lock 方法获得锁
+      // 2：signal 方法唤醒
+      condition.signal();// condition 对象的 signal 方法可以唤醒 wait 线程
+      for (int i = 0; i < 5; i++){
+        System.out.println("ThreadName=" + Thread.currentThread().getName() + ("" + (i+1)));
+      }
+    }catch (InterruptedException e) {
+      e.printStackTrace();
+    } finally {
+      lock.unlock();
+    }
+  }
+}
+```
+
+**Condition 类和 Object 类锁方法对比**
+
+1. Condition 类的 await 方法和 Object 类的 wait 方法等效。
+2. Condition 类的 signal 方法和 Object 类的 notify 方法等效。
+3. Condition 类的 signalAll 方法和 Object 类的 notifyAll 方法等效。
+4. ReentrantLock 类可以唤醒指定条件的线程，而 Object 的唤醒是随机的。
+
+**tryLock 和 lock 和 lockInterruptibly 的区别**
+
+1. tryLock 能获得锁就返回 true，不能就立即返回 false，tryLock(long timeout, TimeUnit unit)，可以增加时间限制，如果超过该时间还没获得锁，返回 false。
+2. lock 能获取锁就返回 true，不能的话一直等待获取锁。
+3. lock 和 lockInterruptibly，如果两个线程分别执行这两个方法，但此时中断这个线程，lock 不会抛出异常，而 lockInterruptibly 会抛出异常。
+
