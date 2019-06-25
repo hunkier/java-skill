@@ -1651,3 +1651,127 @@ LinkedBlockingQueue 会默认一个类似无限大小的容量 (Integer.MAX_VALU
 是一个由链表结构组成的双向阻塞队列。所谓双向队列指的你可以从队列的两端插入和移出元素。双端队列因为多路一个操作队列的入口，在多线程同时入队时，也就减少了一半的竞争。相比其他阻塞队列，LinkedBlockingDeque 多了 addFirst，addLast，offerFirst，offerLast，peekFirst，peekLast 等方法，以 Last 单词结尾的方法，标识插入，获取或移除双端队列的最后一个元素。另插入方法 add 等同于 addLast，移除方法 remove 等效于 removeFirst。但是 take 方法却等同于 takeFirst，不知道是不是 Jdk 的 bug，使用时还是带有 First 和 Last 后缀的方法更清楚。
 
    在初始化 LinkedBlockingDque 时可以设置容量防止其过度膨胀。另外双向阻塞队列可以运用在 "工作窃取" 模式中。
+
+
+
+
+
+### 4.1.15. CyclicBarrier、CountDownLatch、Semaphore 的用法
+
+#### 4.1.15.1. CountDownLatch (线程计数器)
+
+CountDownLatch 类位于 java.util.concurrent 包下，利用它可以实现类似计数器的功能。比如有一个任务 A，它要等待其他 4 个任务执行完毕之后才能执行，此时就可以利用 CountDownLatch 来实现这种功能了。
+
+```java
+final CountDownLatch latch = new CountDownLatch(2);
+new Thread(){public void run(){
+  System.out.println("子线程" + Thread.currentThread().getName() + "正在执行");
+  Thread.sleep(3000);
+  System.out.println("子线程" + Thread.currentThread().getName() + "执行完毕");
+  latch.countDown();
+}}.start();
+new Thread(){ public void run() {
+  System.out.println("子线程" + Thread.currentThread().getName() + "正在执行");
+  Thread.sleep(3000);
+  System.out.println("子线程" + Thread.currentThread().getName() + "执行完毕");
+}}.start();
+System.out.println("等待 2 个子线程执行完毕...");
+latch.await();
+System.out.println("2个子线程已经执行完毕");
+System.out.println("继续执行主线程");
+```
+
+#### 4.1.15.2. CyclicBarrier (回环栅栏-等待至 barrier 状态再全部同时执行)
+
+字面意思回环栅栏，通过它可以实现一组线程等待至某个状态之后再全部同时执行。叫做回环是因为当所有等待线程都被释放以后，CyclicBarrier 可以被重用。我们暂且把这个状态就叫做 barrir，当调用 await() 方法之后，线程就处于 barrier 了。
+
+CyclicBarrier 中最重要的方法就是 await 方法，它有 2 个重载版本：
+
+1. public int await(): 用来挂起当前线程，直至所有线程都到达 barrier 状态再同时执行后续任务；
+2. public int await(long timeout, TimeUnit unit): 让这些线程等待至一定的时间，如果还有线程没有到达 barrier 状态就让到达 barrier 的线程先执行后续任务。
+
+具体如下，另外 CyclicBarrier 是可以重用的。
+
+```java
+public static void main(String[] args) {
+  int N = 4;
+  CyclicBarrier barrier = new CyclicBarrier(N);
+  for(int i=0; i < N; i++){
+    new Writer(barrier).start();
+  }
+  static class Writer extends Thread {
+    private CyclicBarrier cyclicBarrier;
+    public Wirter(CyclicBarrier cyclicBarrier){
+      this.cyclicBarrier = cyclicBarrier;
+    }
+    
+    @Override
+    public void run(){
+      try {
+        Thread.sleep(5000); // 以睡眠来模拟线程需要预定写入数据操作
+        System.out.println("线程" + Thread.currentThread().getName() + "写入数据完毕，等待其他线程写入完毕");
+        cyclicBarrier.await();
+      } catch(InterruptedException e) {
+        e.printStackTrace();
+      } catch(BrokenBarrierException e) {
+        e.printStackTrace();
+      }
+      System.out.println("所有线程写入完毕，继续处理其他任务，比如数据操作");
+    }
+  }
+}
+```
+
+#### 4.1.15.3. Semaphore (信号量-控制同时访问的线程个数)
+
+Semaphore 翻译成字面意思为：信号量，Semaphore 可以控制同时访问的线程个数，通过 acquire() 获取一个许可，如果没有就等待，而 release() 释放一个许可。
+
+Semaphore 类中比较重要的几个方法：
+
+1. public void acquire(): 用来获取一个许可，若无许可以获得，则会一直等待，直到获得许可。
+2. public void acquire(int permits)：获取 permits 个许可
+3. public void release(): 释放许可。注意，在释放许可之前，必须先获得许可。
+4. public void release(int permits): 释放 permits 个许可
+
+上面 4 个方法都会被阻塞，如果想立即得到执行结果，可以使用下面几个方法：
+
+1. public boolean tryAcquire(): 尝试获取一个许可，若获取成功，则立即返回 true，若获取失败，则立即返回 false
+2. public boolean tryAcquire(long timeout, TimeUnit unit): 尝试获取一个许可，若在指定时间获取成功，则立即返回 true，否则返回 false
+3. public boolean tryAcquire(int permits): 尝试获取 permits 个许可，若获取成功，则立即返回 true，若获取失败，则立即返回 false
+4. public boolean tryAcquire(int permits, long timeout, TimeUnit unit): 尝试获取 permits 个许可，若在指定的时候内获取成功，则立即返回 true，否则立即返回 false
+5. 还可以通过 availablePermits() 方法得到可用的许可数目。
+
+例子：若一个工厂有 5 台机器，当是有 8 个工人，一台机器同时只能被一个工人使用，只有使用完了，其他工人才能继续使用。那么我们就可以通过 Semaphore 来实现：
+
+```java
+int N = 8； // 工人数
+Semaphore semaphore = new Semaphore(5); // 机器数目
+for(int i=0; i<N; i++){
+  new Worker(i, semaphore).start();
+}
+static class Worker extends Thread{
+  private int num;
+  private Semaphore semaphore;
+  public Worker(int num, Semaphore semaphore){
+    this.num = num;
+    this.semaphore = semaphore;
+  }
+  
+  @Override
+  public void run(){
+    try{
+      semaphore.acquire();
+      System.out.println("工人" + this.num + "占用一个机器在生产...");
+      Thread.sleep(2000);
+      System.out.println("工人" + this.num + "释放出机器");
+      semaphore.release();
+    }catch (InterruptedException e){
+      e.printStackTrace();
+    }
+  }
+}
+```
+
+CountDownLatch 和 CyclicBarrier 都能够实现线程之间的等待，只不过它们的侧重点不同；CountDownLatch 一般用于某个 A 等待若干个其他线程执行完任务之后，它才执行；而 CyclicBarrier 一般用于一组线程组相互等待至某个状态，然后这一组线程再同时执行；另外，CountDownLatch 是不能重用的，而 CyclicBarrier 是可以重用的。
+
+Semaphore 其他和锁有点类似，它一般用于控制对某组资源的访问权限。
