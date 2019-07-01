@@ -1910,3 +1910,106 @@ Java 里面进行多线程通信的主要方式就是共享内存，共享内存
 ### 4.1.18.  ThreadLocal 作用 (线程本地存储)
 
 ThreadLocal，很多地方叫做线程本地变量，也有地方叫做线程本地存储，ThreadLocal 的作用是提供线程内的局部变量，这种变量在线程的生命周期内起作用，减少同一个线程内多个函数或者组件一些公共变量传递的复杂度。
+
+ThreadLocalMap (线程的一个属性)
+
+1. 每个线程中都有一个自己的 ThreadLocalMap 类对象，可以将线程自己的对象保持到其中，各管各的，线程可以正确的访问到自己的对象。
+
+2. 将一个共用的 ThreadLocal 静态实例作为 key，将不同对象的引用保存到不同线程的 ThreadLocalMap 中，然后在线程执行的各处通过这个静态 ThreadLocal 实例的 get() 方法取得自己线程保存的那个对象，避免了将这个对象作为参数传递的麻烦。
+
+3. ThreadLocalMap 其实就是线程里面的一个属性，它在 Thread 类中定义
+
+   ​	ThreadLocal.ThreadLocalMap threadLocals = null ;
+
+
+
+
+
+
+
+
+
+使用场景
+
+   最常见的 ThreadLocal 使用场景为用来解决数据库连接、Session 管理等。
+
+```java
+private static final ThreadLocal threadSession = new ThreadLocal();
+public static Sesstion getSession() throws InfrastructureException {
+  Session s = (Session) threadSession.get();
+  try {
+    if (s == null ){
+      s = getSessionFactory().openSession();
+      threadSession.set(s);
+    }
+  } catch (HibernateException ex) {
+    throw new InfrastructureException(ex);
+  }
+  return s;
+}
+```
+
+
+
+### 4.1.19.  synchronized 和 ReentrantLock 的区别
+
+#### 4.1.19.1.  两者的共同点
+
+1. 都是用来协调多线程对象对共享对象、变量的访问
+2. 都是可重入锁，同一线程可以多次获得同一个锁
+3. 都保证了可见性和互斥性
+
+#### 4.1.19.2.  两者的不同点
+
+1. ReentrantLock 显式的获得、释放锁，synchronized 隐式获得释放锁
+2. ReentrantLock 可响应中断、可轮回，synchronized 是不可以响应中断的，为处理锁的不可用性提供了更高的灵活性
+3. ReentrantLock 是 API 级别的，synchronized 是 JVM 级别的
+4. ReentrantLock 是可以实现公平锁
+5. ReentrantLock 通过 Condition 可以绑定多个条件
+6. 底层实现不一样，synchronized是同步阻塞，使用的是悲观并发策略，lock 是同步非阻塞，采用的是乐观并发策略
+7. Lock 是一个接口，而 synchronized 是 Java 中的关键字，synchronized 是内置语言实现。
+8. synchronized 在发生异常时，会自动释放线程占用的锁，因此不会导致死锁的现象发生；而 Lock 在发生异常时，如果没有主动通过 unLock() 去释放锁，则很有可能造成死锁现象，因此使用 Lock 时需要在 finally 块中释放锁。
+9. Lock 可以让等待锁的线程响应中断，而 synchronized 却不行，使用 synchronized 时，等待的线程会一直等待下去，不能够响应中断。
+10. 通过 Lock 可以知道有没有成功获取锁，而 synchronized 却无法办到。
+11. Lock 可以提高多个线程进行读操作的效率，即就是实现读写锁等。
+
+### 4.1.20.  ConcurrentHashMap 并发
+
+#### 4.1.20.1. 减小锁的粒度
+
+减小锁的粒度是指缩小锁定对象的范围，从而减小锁冲突的可能性，从而提高系统的并发能力。减小锁粒度是一种削弱多线程竞争的有效手段，这种技术典型的应用是 ConcurrentHashMap (高性能的 HashMap)类的实现。对于 HashMap 而言，最重要的是两个方法 get 与 set 方法，如果我们对整个 HashMap 加锁，可以得到线程安全的对象，但是加锁粒度不能太大。Segment 的大小也被称为 ConcurrentHashMap 的并发度。
+
+#### 4.1.20.2  ConcurrentHashMap 分段锁
+
+ConcurrentHashMap，它的内部细分了若干个小的 HashMap，称之为段 (Segment)。默认情况下一个 ConcurrentHashMap 被进一步细分为 16 个段，就是锁的并发度。
+
+如果需要在 ConcurrentHashMap 中添加一个新的表项，并不是将整个 HashMap 加锁，而是首先根据 hashcode 得到该表项应该存放在哪个段中，然后对该段加锁，并完成 put 操作。在多线程环境中，如果多个线程同时进行 put 操作，只要被加入的表项不存放在同一个段中，则线程间可以做到真正的并行。
+
+**ConcurrentHashMap 是由 Segment 数组结构和 HashEntry 数组结构组成**
+
+ConcurrentHashMap 是由 Segment 数组结构和 HashEntry 数组组成。Segment 是一种可以重入锁 ReentrantLock，在 ConcurrentHashMap 里扮演锁的角色，HashEntry 则用于存储键值对数据。一个 ConcurrentHashMap 里包含一个 Segment 数组，Segment 的结构和 HashMap 类似，是一种数组和链表结构，一个 Segment 里面包含一个 HashEntry 数组，每个 HashEntry 是一个链表结构的元素，每个 Segment 守护一个 HashEntry 数组里的元素，当对 HashEntry 数组的数据进行修改时，必须首先获得对应的 Segment 锁。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 4.1.21.  Java 中用到的线程调度
+
+#### 4.1.21.1. 抢占式调度：
+
+抢占式调度指的是每条线程执行的时间、线程的切换都有系统控制，系统控制指的是在系统某种运行机制下，可能每条线程都分同样的执行时间片，也可能是某些线程执行的时间片较长，甚至某些线程得不到执行的时间片。在这种机制下，一个线程的堵塞不会导致整个进程堵塞。
+
+#### 4.1.21.2.  协同式调度：
+
+协同式调度指某一线程执行完后主动通知系统切换到另外一个线程上执行，这种模式就像接力赛一样，
+
