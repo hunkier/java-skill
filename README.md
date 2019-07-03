@@ -2148,3 +2148,61 @@ CAS 会导致 "ABA 问题"。CAS 算法实现一个重要前提是需要取出�
 
 部分乐观锁的实现是通过版本号 (version) 的方式来解决 ABA 问题，乐观锁每次在执行数据数据的修改操作时，都会带上一个版本号，一旦版本号和数据的版本号一致就可以执行修改操作并对版本号执行 +1 操作，否则就执行失败。因为每次操作的版本号都会随之增加，所以不会出现 ABA 问题，因为版本号只会增加不会减少。
 
+### 4.1.14. 什么是 AQS (抽象的队列同步器)
+
+AbstractQueuedSynchronizer 类如其名，抽象的队列式的同步器，AQS 定义了一套多线程访问共享资源的同步器框架，许多同步类实现都依赖于它，如常用的 ReentrantLock/Semaphore/CountDownLatch。
+
+
+
+
+
+
+
+
+
+它维护了一个 volatile in state (代表共享资源) 和一个 FIFO 线程等待队列 (多线程争用资源被阻塞时会进入此队列)。这里 volatile 是核心关键词，具体 volatile 的语义，在此不述。state 的访问有三种：
+
+```java
+		getState()
+    setState()
+    compareAndSetState()
+```
+
+AQS 定义两种资源共享方式
+
+Exclusive 独占资源-ReentrantLock
+
+Exclusive (独占，只有一个线程能执行，如 ReentrantLock)
+
+Share 共享资源-Semaphore/CountDownLatch
+
+Share (共享，多个线程可同时执行，如 Semaphore/CountDownLatch)。
+
+AQS 只是一个框架，具体资源的获取/释放方式交由自定义同步器去实现，AQS 这里只定义了一个接口，具体资源的获取交由自定义同步器去实现了 (通过 state 的 get/set/CAS) 之所以没有定义成 abstract，是因为独占模式下只有实现 tryAcquire-tryRelease，而共享模式下只用实现 tryAcquireShared-tryReleaseShared。如果定义成 abstract，那么每个都要去实现另一模式下的接口。不同的自定义同步器争用共享资源的方式也不同。自定义同步器在实现时只需要实现共享资源 state 的获取与释放方式即可，至于具体线程等待队列的维护 (如获取资源失败入队/唤醒出队等)，AQS 已经在顶层实现好了。自定义同步器实现时主要实现以下几种方法：
+
+1. isHeldExclusively()：该线程是否正在独占资源。只有用的 condition 才需要去实现它。
+2. tryAcquire(int)：独占方式。尝试获取资源，成功则返回 true，失败返回 false。
+3. tryRelease(int)：独占方式。尝试释放资源，成功则返回 true，失败返回 false。
+4. tryAcquireShared(int)：共享方式。尝试获取资源。负数表示失败； 0 表示成功，但没有剩余可用资源；正数表示成功，且有剩余资源。
+5. tryReleaseShared(int)：共享方式。尝试释放资源，如果释放后允许唤醒后续等待进程返回 true，否则返回 false。
+
+**同步器的实现是 ABS 核心 (state 资源状态计数)**
+
+同步器的实现是 ABS 核心，以 ReentrantLock 为例，state 初始化为 0，表示未锁定状态。A 线程 lock() 时，会调用 tryAcquire() 独占该锁并将 state+1。此后，其他线程再 tryAcquire() 时就会失败，直到 A 线程 unlock() 到 state=0 (即释放锁) 为止，其他线程才有机会获取该锁。当然，释放锁之前，A 线程自己是可以重复获取此锁的 (state 会累加)，这就是可重入的概念。但要注意，获取多少次就要释放多少次，这样才能保证 state 是能回到零态的。
+
+   以 CountDownLatch 为例，任务分为 N 个子线程去执行，state 也初始化为 N (注意 N 要与线程个数一致)。这 N 个子线程是并行执行的，每个子线程执行完后 countDown() 一次，state 会 CAS 减 1。等到所有子线程都执行完后(即 state=0)，会 unpark() 主调用线程，然后主调用线程就会从 await() 函数返回，继续剩余动作。
+
+**ReentrantReadWriteLock 实现独占和共享两种方式**
+
+  一般来说，自定义同步器要么是独占方法，要么是共享方式，他们也只需实现 tryAcquire-tryRelease、tryAcquireShared-tryReleaseShared 中的一种即可。但 AQS 也支持自定同步器同时实现独占和共享两种方式，如ReentrantReadWriteLock。
+
+
+
+
+
+### 5.1.1.  Java 异常分类及处理
+
+#### 5.1.1.1. 概念
+
+ 如果某个方法不能按照正常的途径完成任务，就可以通过另外一种路劲退出方法。在这种情况下会抛出一个封装了错误信息的对象。此时，这个方法会立刻退出同时不返回任何值。另外，调用这个方法的其他代码也无法继续执行，异常
+
