@@ -2098,3 +2098,53 @@ CAS 操作是抱着乐观锁的态度进行的(乐观锁)，它总是认为自�
 #### 4.1.23.2. 原子包 java.util.concurrent.atomic (锁自旋)
 
 JDK 1.5 的原子包：java.util.concurrent.atomic 这个包里面提供了一组原子类。其基本的特性就是在多线程环境下，当有多个线程同时执行这些类的实例包含的方法时，具有排他性，即当某个线程进入方法，执行其中的指令时，不会被其他线程打断，而别的线程就像自旋锁一样，一直等到该方法执行完成，才由 JVM 从等待队列中选择一个一个另外的一个线程进入，这只是一种逻辑上解释。相对于 synchronized 这种阻塞算法，CAS 是非阻塞算法的一种常见实现。由于一般 CPU 切换时间比 CPU 指令集操作更加长，所以 J.U.C 在性能上有了很大的提升。如下代码：
+
+```java
+public class AtomicInteger extends Number implements java.io.Serializable {
+  private volatile int vaule;
+  public final int get() {
+    return value;
+  }
+  
+  public final int getAndIncrement() {
+    for(;;){ // CAS 自旋，一直尝试，直到成功
+      int current = get();
+      int next = current + 1;
+      if (compareAndSet(current, next)){
+        return current;
+      }
+    }
+  }
+  
+  public final boolean compareAndSet(int expect, int update) {
+    return unsafe.compareAndSwapInt(this,value,expect,update)
+  }
+}
+```
+
+getAndIncrement 采用了 CAS 操作，每次从内测中读取数据然后将此数据和 +1 后的结果进行 CAS 操作，如果成功就返回结果，否则重试直到成功为止。而 compareAndSet 利用 JNI 来完成 CPU 指令的操作。
+
+```c
+cmpxchg
+/*
+accumulator = AL, AX, or EAX, depending on whether 
+a byte, word, or doubleword comparison is being performed
+*/
+if(accumulator == destination){
+	ZF = 1; // 设置跳转标志
+	Destination = Source; // 原始数据设置到目标里面去
+}
+	else {
+		ZF = 0; // 不设置值了
+		accumulate = Destination;
+	}
+```
+
+#### 4.1.23.3.  ABA 问题
+
+CAS 会导致 "ABA 问题"。CAS 算法实现一个重要前提是需要取出内存中某时刻的数据，而在下时刻比较并替换，那么在这个时间差类会导致数据的变化。
+
+比如说一个线程 one 从内存位置 V 中取出 A，这时候另外一个线程 two 也从内存中取出 A，并且 two 进行了一些操作把 V 变成了 B，然后 two 又将 V 位置的数据变成 A，这时候线程 one 进行 CAS 操作发现内存中仍然是 A，然后 one 操作成功。尽管线程 one 的 CAS 操作成功，但是不代表这个过程就是没有问题的。
+
+部分乐观锁的实现是通过版本号 (version) 的方式来解决 ABA 问题，乐观锁每次在执行数据数据的修改操作时，都会带上一个版本号，一旦版本号和数据的版本号一致就可以执行修改操作并对版本号执行 +1 操作，否则就执行失败。因为每次操作的版本号都会随之增加，所以不会出现 ABA 问题，因为版本号只会增加不会减少。
+
