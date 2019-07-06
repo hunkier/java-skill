@@ -2624,5 +2624,79 @@ Java 平台允许我们在内存中创建可复用的 Java 对象，但一般情
 
 在 Java 中，只要一个类实现了 java.io.Serializable 接口，那么它就可以被序列化。
 
-ObjectOutputStream 和 ObjectInputStream 对对象进行序列化及反序列化
+**ObjectOutputStream 和 ObjectInputStream** 对对象进行序列化及反序列化
 
+通过 ObjectOutputStream 和 ObjectInputStream 对对象进行序列化及反序列化。
+
+**writeObject** 和 **readObject** 自定义序列化策略
+
+在类中增加 writeObject 和 readObject 方法可以实现自定义序列化策略。
+
+**序列化ID**
+
+虚拟机是否允许反序列化，不仅取决于类路径和功能代码是否一致，一个非常重要的一点是两个类的序列化 ID 是否一致 (就是 private static final long serialVersionUID)
+
+序列化并不保存静态变量
+
+序列化子父类说明
+
+要想将父类对象也序列化，就需要让父类也实现 Serializable 接口
+
+Transient 关键字阻止该变量被序列化到文件中
+
+1. 在变量声明前加上 Transient 关键字，可以阻止该变量被序列化到文件中，在被反序列化后，transient 变量的值被设为初始值，如 int 型的是 0，对象型的是 null。
+2. 服务器端给客户端发送序列化对象数据，对象中有一些数据是敏感的，比如密码字符串等，希望对该密码字段在序列化时，进行加密，而客户端如果拥有解密的秘钥，只有在客户端进行反序列化时，才可以对密码进行读取，这样可以一定程度保证序列化对象的数据安全。
+
+### 5.1.7.  Java 复制
+
+将一个对象的引用复制给另外一个对象，一共有三种方式。第一种是直接赋值，第二种是浅拷贝，第三种是深拷贝。所以大家知道了哈，这三种概念实际上都是为了拷贝对象。
+
+#### 5.1.7.1.  直接赋值复制
+
+直接赋值。在 Java 中， A a1 = a2，我们需要理解的是这实际上复制的是引用，也就是说 a1 和 a2 指向的是同一个对象。因此，当 a1 变化的时候，a2 里面的成员变量也会跟着变化。
+
+#### 5.1.7.2.  浅复制 (复制引用但不复制引用的对象)
+
+创建一个新对象，然后将当前对象非静态字段复制到该新对象，如果字段是值类型的，那么该字段执行复制；如果该字段是引用类型的话，则复制引用但不复制引用的对象。因此，原始对象及其副本引用同一个对象。
+
+```java
+class Resume implements Cloneable {
+		public Object clone(){
+      try {
+        return (Resume)super.clone();
+      }catch (Exception e){
+        e.printStackTrace();
+        return null;
+      }
+    }
+}
+```
+
+#### 5.1.7.3.  深复制 (复制对象和其引用对象)
+
+```java
+class Student implements Cloneable {
+  String name;
+  int age;
+  Professor p;
+  Student(String name,int age, Professor p) {
+    this.name = name;
+    this.age = age;
+    this.p = p;
+  }
+  public Object clone() {
+    Student o = null;
+    try {
+      o = (Student)super.clone();
+    }catch (CloneNotSupportedExcepton e){
+      System.out.println(e.toString());
+    }
+    o.p = (Professor)p.clone();
+    return o;
+  }
+}
+```
+
+#### 5.1.7.4. 序列化 (深 clone — 中实现)
+
+   在 Java 语言里深复制一个对象，常常可以先使对象实现 Serializable 接口，然后把对象 (实际上只是对象的一个拷贝) 写到一个流，再从流里读出来，便可以重建对象。
