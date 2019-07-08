@@ -2700,3 +2700,132 @@ class Student implements Cloneable {
 #### 5.1.7.4. 序列化 (深 clone — 中实现)
 
    在 Java 语言里深复制一个对象，常常可以先使对象实现 Serializable 接口，然后把对象 (实际上只是对象的一个拷贝) 写到一个流，再从流里读出来，便可以重建对象。
+
+
+
+# 6. Spring 原理
+
+它是一个全面的、企业应用开发一站式的解决方案，贯穿表现层、业务层、持久层。但是 Spring 仍然可以和其他框架无缝整合。
+
+### 6.1.1.  Spring 特点
+
+#### 6.1.1.1. 轻量级
+
+#### 6.1.1.2. 控制反转
+
+#### 6.1.1.3. 面向切面
+
+#### 6.1.1.4. 容器
+
+#### 6.1.1.5. 框架集合
+
+
+
+### 6.1.2. Spring 核心组件
+
+
+
+
+
+
+
+
+
+### 6.1.3.  Spring 常用模块
+
+
+
+
+
+
+
+
+
+### 6.1.4.  Spring 主要包
+
+
+
+
+
+
+
+
+
+### 6.1.5.  Spring 常用注解
+
+bean 注入与装配的方式有很多种，可以通过 xml、get/set 方式、构造函数或者注解等。简单易用的方式就是使用 Spring 的注解了，Spring 提供了大量的注解方式。
+
+
+
+
+
+
+
+
+
+### 6.1.6. Spring 第三方结合
+
+
+
+
+
+
+
+
+
+### 6.1.7. Spring IOC 原理
+
+#### 6.1.7.1.  概念
+
+Spring 通过一个配置文件描述 Bean 及 Bean 之间的依赖关系，利用 Java 语言的反射功能实例化 Bean 并建立 Bean 之间的依赖关系。Spring 的 IOC 容器在完成这些底层工作的基础上，还提供了 Bean 实例缓存、生命周期管理、Bean 实例代理、时间发布、资源装载等高级服务。
+
+#### 6.1.7.2. Spring 容器高层视图
+
+Spring 启动时读取应用程序提供的 Bean 配置信息，并在 Spring 容器中生成一份相应的 Bean 配置注册表，然后根据这张注册表实例化 Bean 信息，装配好 Bean 之间的依赖关系，为上层应用提供准备就绪的运行环境。其中 Bean 缓存池为 HashMap 实现。
+
+
+
+
+
+
+
+
+
+#### 6.1.7.3.  IOC 容器实现
+
+**BeanFactory-框架基础设施**
+
+​    BeanFactory 是 Spring 框架的基础设施，面向 Spring 本身；ApplicationContext 面向使用 Spring 框架的开发者，几乎所有的应用场合我们都直接使用 ApplicationContext 而非底层的 BeanFactory。
+
+
+
+
+
+
+
+**BeanDefinitionRegistry 注册表**
+
+1. Spring 配置文件中每一个节点元素在 Spring 容器里都通过一个 BeanDefinition 对象表示，它描述了 Bean 的配置信息。而 BeanDefinitionRegistry 接口提供了向容器手工注册 BeanDefinition 对象的方法。
+
+**BeanFactory 顶层接口**
+
+2. 位于类结构树的顶端，它最主要的方法就是 getBean(String beanName)，该方法从容器中返回特定名称的 Bean，BeanFactory 的功能通过其他的接口得到不断的扩展：
+
+**ListableBeanFactory**
+
+3. 该接口定义了访问容器中 Bean 基本信息的若干方法，如查看 Bean 的个数、获取某一个类型 Bean 的配置名、查看容器中是否包括某一 Bean 等方法。
+
+**HierarchicalBeanFactory 父子级联**
+
+4. 父子级联 IoC 容器的接口，子容器可以通过接口方法访问父容器；通过HierarchicalBeanFactory 接口，Spring 的 IoC 容器可以建立父子层级关联的容器体系，子容器可以访问父容器中的 Bean，但父容器不能访问子容器的 Bean。Spring 使用父子容器实现了很多功能，比如在 Spring MVC 中，展现层 Bean 位于一个子容器中，而业务层和持久层的 Bean 位于父容器中。这样，展现层 Bean 就可以引用业务层和持久层的 Bean，而业务层和持久层的 Bean 则看不到展现层的 Bean。
+
+**ConfigurableBeanFactory**
+
+5. 是一个重要的接口，增强了 IOC 容器的可定制性，它定义了设置类装载器、属性编辑器、容器初始化后置处理器等方法；
+
+**AutowireCapableBeanFactory 自动装配**
+
+6. 定义了将容器中的 Bean 按某种规则 (如按名字匹配、按类型匹配) 进行自动装配的方法；
+
+SingletonBeanRegistry
+
