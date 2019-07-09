@@ -2827,5 +2827,74 @@ Spring 启动时读取应用程序提供的 Bean 配置信息，并在 Spring �
 
 6. 定义了将容器中的 Bean 按某种规则 (如按名字匹配、按类型匹配) 进行自动装配的方法；
 
-SingletonBeanRegistry
+**SingletonBeanRegistry 运行期间注册单例 Bean**
 
+7. 定义了允许在运行期间向容器注册单实例 Bean 的方法；对于单实例 ( singleton ) 的 Bean 来说，BeanFactory 会缓存 Bean 实例，所以第二次使用 getBean 时将直接从 IoC 容器的缓存中获取 Bean 实例。Spring 在 DefaultSingletonBeanRegistry 类中提供了一个用于缓存单实例 Bean 的缓存器，它是一个用 HashMap 实现的缓存器，单实例的 Bean 以 beanName 为键保存正在这个 HashMap 中。
+
+**依赖日志框架**
+
+8. 在初始化 BeanFactory 时，必须为其提供一种日志框架，比如使用 Log4J，即在类路径下提供 Log4J 配置文件，这样启动 Spring 容器才不会报错。
+
+**ApplicationContext 面向开发应用**
+
+ApplicationContext 由 BeanFactory 派生而来，提供了更多面向实际应用的功能。ApplicationContext 继承了 HierarchicalBeanFactory 和 ListableBeanFactory 接口，在此基础上，还通过多个其他的接口扩展了 BeanFactory 的功能：
+
+
+
+
+
+
+
+1. ClassPathXmlApplicationContext：默认从类路径加载配置文件
+2. FileSystemXmlApplicationContext：默认从文件系统中装载配置文件
+3. ApplicationEventPublisher：让容器拥有发布应用上下文事件的功能，包括容器启动事件、关闭事件等。
+4. MessageSource：为应用提供 i18n 国际化消息访问的功能；
+5. ResourcePatternResolver： 所有 ApplicationContext 实现类都实现了类似于 PathMatchingResourcePatternResolver 的功能，可以通过带前缀的 Ant 风格的资源文件路径装载 Spring 的配置文件。
+6. LifeSycle：该接口是 Spring 2.0 加入的，该接口提供了 start() 和 stop() 两个方法，主要用于控制异步处理过程。在具体使用时，该接口同时被 ApplicationContext 实现及具体 Bean 实现，ApplicationContext 会将 start/stop 的信息传递给容器中所有实现了该接口的 Bean，以达到管理和控制 JMX、任务调度等目的。
+7. ConfigurableApplicationContext 扩展与 ApplicationContext，它新增加了两个主要的方法：refresh() 和 close()，让 ApplicationContext 具有启动、刷新和关闭应用上下文的能力。在应用上下文关闭的情况下调用 refresh() 即可启动应用上下文，在已经启动的状态下，调用 refresh() 则清除缓存并重新装载配置信息，而调用 close() 则可关闭应用上下文。
+
+**WebApplication 体系架构**
+
+WebApplicationContext 是专门为 Web 应用准备的，它允许从相对于 Web 根目录路径中装载配置文件完成初始化工作。从 WebApplicationContext 中可以获得 ServletContext 的引用，整个 Web 应用上下文对象将作为属性放到 ServletContext 中，以便 Web 应用环境可以访问 Spring 应用上下文。
+
+
+
+
+
+
+
+#### 6.1.7.4.  Spring Bean 作用域
+
+Spring 3 中为 Bean 定义了 5 种作用域，分别为 singleton (单例)、prototype (原型)、request、session 和 global session，5 种作用域说明如下：
+
+**singleton：单例模式 (多线程下不安全)**
+
+1. singleton：单例模式，Spring IoC 容器中只会存在一个共享的 Bean 实例，无论有多少个 Bean 引用它，始终指向同一对象。该模式在多线程下是不安全的。Singleton 作用域是 Spring 中的缺省作用域，也可以显示的将 Bean 定义为 singleton 模式，配置为：
+
+2. ```xml
+   <bean id="userDao" class="com.ioc.UserDaoImpl" scope="singleton" />
+   ```
+
+**prototype：原型模式每次使用时创建**
+
+2. prototype：原型模式，每次通过 Spring 容器获取 prototype 定义的 bean 时，容器都将创建一个新的 Bean 实例，每个 Bean 实例都有自己的属性和状态，而 singleton 全局只有一个对象。根据经验，对有状态的 bean 使用 prototype 作用域，而对无状态的 bean 使用 singleton 作用域。
+
+**Request：一次 request 一个实例**
+
+3. request：在一次 Http 请求中，容器会返回该 Bean 的同一实例。而不同的 Http 请求则会产生新的 Bean，而且该 bean 仅在当前 Http Request 内有效，当前 Http 请求结束，该 bean 实例也将会被销毁。
+
+```xml
+<bean id="loginAction" class="cn.hunkier.Login" scope="request" />
+```
+
+**Session**
+
+4. session：在一次 Http Session 中，容器会返回该 Bean 的同一实例。而对不同的 Session 请求则会创建新的实例，该 bean 实例仅在当前 Session 内有效。同 Http 请求相同，每次 session 请求创建新的实例，而不同的实例之间不共享属性，且实例仅在自己的 Session 请求内有效，请求结束，则实例将被销毁。
+
+```xml
+<bean id="userPreference" class="cn.hunkier.ioc.UserPreference" scope="session" />
+```
+
+**global Session**
+
+5. global Session：在一个全局的 Http Session 中，容器会返回该 Bean 的同一实例，仅在使用 portlet context 时有效。
