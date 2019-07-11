@@ -2963,3 +2963,95 @@ destroy-method 自配置清理
 <bean id="" class="" init-method="初始化方法" destroy-method="销毁方法" />
 ```
 
+#### 6.1.7.6.  Spring 依赖注入四种方式
+
+**构造器注入**
+
+```java
+/* 带参数，方便利用构造函数进行注入 */
+public CatDaoImpl(String message){
+  this.message = message;
+}
+```
+
+```xml
+<bean id="CatDaoImpl" class="com.CatDaoIpl">
+		<constructor-arg value="message"></constructor-arg>
+</bean>
+```
+
+**setter 方法注入**
+
+```java
+public class Id {
+  private int id;
+  public int getId(){ return id; }
+  public void setId(int id) { this.id = id; }
+}
+```
+
+```xml
+<bean id="id" class="cn.hunkier.Id">
+		<property name="id" value="123"></property>
+</bean>
+```
+
+**静态工厂注入**
+
+静态工厂顾名思义，就死通过静态工厂的方法来获取自己需要的对象，为了让 Spring 管理所有的对象，我们不能直接通过 "工厂类.静态方法()" 来获取对象，而是依然通过 spring 注入的形式获取：
+
+```java
+public class DaoFactory {// 静态工厂
+  public static final FactoryDao getStaticFactoryDaoImpl() {
+    return new StaticFactoryDaoImpl();
+  }
+}
+
+public class SpringAction {
+  private FactoryDao staticFactoryDao; // 注入对象
+  // 注入对象的 set 方法
+  public void setStaticFactoryDao(FactoryDao staticFactoryDao){
+    this.staticFactoryDao = staticFactoryDao;
+  }
+}
+// factory-method="getStaticFactoryDaoImpl" 指定调用哪个工厂方法
+```
+
+```xml
+<bean name="springAction" class="cn.hunkier.SpringAction">
+	<!-- 使用静态工厂的方法注入对象，对应下面的配置文件 -->
+  <property name="staticFactoryDao" ref="staticFactoryDao"></property>
+</bean>
+<!-- 此处获取对象的方式是从工厂类中获取静态方法 -->
+<bean name="staticFactoryDao" class="cn.hunkier.DaoFactory" factory-method="getStaticFactoryDaoImpl"></bean>
+```
+
+**实例工厂**
+
+实例工厂的意思是获取对象实例的方法不是静态，所以需要首先 new 工厂类，在调用普通的实例方法：
+
+```java
+public class DaoFactory { // 实例工厂
+	public FactoryDao getFactoryDaoImpl(){
+    return new FactoryDaoImpl();
+  }
+}
+
+public class SpringAction {
+  private FactoryDao factoryDao;  // 注入对象
+  public void setFactoryDao(FactoryDao factoryDao){
+    this.factoryDao = factoryDao;
+  }
+}
+```
+
+```xml
+<bean name="springAction" class="cn.hunkier.SpringAction">
+	<!-- 使用实例工厂的方法注入对象，对应下面的配置文件 -->
+	<property name="factoryDao" ref="factoryDao"></property>
+</bean>
+<!-- 此处获取对象的方式是从工厂类中获取实例的方法 -->
+<bean name="daoFactory" class="cn.hunkier.DaoFactory"></bean>
+<bean name="factoryDao" factory-bean="daoFactory" factory-method="getFactoryDaoImpl"></bean>
+```
+
