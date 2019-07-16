@@ -3055,3 +3055,127 @@ public class SpringAction {
 <bean name="factoryDao" factory-bean="daoFactory" factory-method="getFactoryDaoImpl"></bean>
 ```
 
+
+
+### 6.1.7.7.  5 种不同方式的自动装配
+
+Spring 装配包括手动装配和自动装配，手动装配是有基于 xml 装配、构造方法、setter 方法等自动装配有五种自动装配的方式，可以用来指导 Spring 容器用自动装配方式来进行依赖注入。
+
+1. no：默认的方式是不进行自动装配，通过显式设置 ref 属性来进行装配。
+2. byName：通过参数名自动装配，Spring 容器在配置文件中发现 bean 的 autowire 属性被设置成 byname，之后容器试图匹配、装配和该 bean 的属性具有相同名字的 bean。
+3. byType：通过参数类型自动装配，Spring 容器在配置文件中发现 bean 的 qutowire 属性被设置成 byType，之后容器试图匹配、装配和该 bean 的属性具有相同类型的 bean。如果有多个 bean 符合条件，则抛出错误。
+4. constructor：这个方式类似于 byType，但是要提供给构造器参数，如果没有确定的带参数的构造参数类型，将会抛出异常。
+5. autodetect：首先尝试使用 constructor 来自动装配，如果无法工作，则使用byType方式。
+
+
+
+### 6.1.8.  Spring AOP 原理
+
+#### 6.1.8.1.  概念
+
+"横切"的技术，剖析开封装的对象内部，并将那些影响了多个类的公共行为封装到一个可重用的模块，并将其命名为"Aspect"，即切面。所谓切面，简单说就是那些与业务无关，却为业务模块所共同调用的逻辑或责任封装起来，便于减少系统的重复代码，降低模块之间的耦合度，并有利于未来的可操作性和可维护性。
+
+使用"横切"技术，AOP 把软件系统分为两个部分：核心关注点和横切关注点。业务处理的主要流程是核心关注点，与之关系不大的部分是横切关注点。横切关注点的一个特点是，它们经常发生在核心关注点的多出，而各处基本相似，比如权限认证、日志、事物。AOP 的作用在于分离系统中的各种关注点，将核心关注点和横切关注点分离开来。
+
+AOP 主要应用场景有：
+
+1. Authentication 权限
+2. Caching 缓存
+3. Context passing 内容传递
+4. Error handling 错误处理
+5. Lazy loading 懒加载
+6. Debugging 调试
+7. logging、tracing、profiling and monitoring 记录跟踪、优化、校准
+8. Performance optimization 性能优化
+9. Persistence 持久化
+10. Resource pooling 资源池
+11. Synchronization 同步
+12. Transactions 事物
+
+#### 6.1.8.2.  AOP 核心概念
+
+1. 切面 (aspect)：类是对物体特征的抽象，切面就是对横切关注点的抽象
+2. 横切关注点：对哪些方法进行拦截，拦截后怎么处理，这些关注点称之为横切关注点。
+3. 连接点 (joinpoint)：被拦截到点，因为 Spring 只支持方法类型的连接点，所以在 Spring 中连接点指的就是被拦截到方法，实际上连接点还可以是字段或者构造器。
+4. 切入点 (pointcut)：对连接点进行拦截的定义
+5. 通知 (advice)：所谓通知指的就是指拦截到连接点之后要执行的代码，通知分为前置、后置、异常、最终、环绕通知五类。
+6. 目标对象：代理的目标对象。
+7. 织入 (weave)：将切面应用到目标对象并导致代理对象创建的过程
+8. 引入 (introduction)：在不修改代码的前提下，引入可以子啊运行期为类动态地添加一些方法或字段。
+
+
+
+
+
+
+
+
+
+#### 6.1.8.3.  AOP 两种代理方式
+
+Spring 提供了两种方式来生成代理对象：JDKProxy 和 Cglib，具体使用哪种方式生成由 AopProxyFactory 根据 AdvisedSupport 对象的配置来决定。默认的策略是如果目标类是接口，则使用 JDK 动态代理技术，否则使用 Cglib 来生成代理。
+
+**JDK 动态接口代理**
+
+1. JDK 动态代理主要涉及到 java.lang.reflect 包中的两个类：Proxy 和 InvocationHandler。InvocationHandler 是一个接口，通过实现该接口定义横切逻辑，并通过反射机制调用目标类的代码，动态将横切逻辑和业务逻辑编制在一起。Proxy 利用 InvocationHandler 动态创建一个符合某一接口的实例，生成目标类的代理对象。
+
+**CGLIb 动态代理**
+
+2. CGLIb 全称为 Code Generation Library，是一个强大的高性能，高质量的代码生成类库，可以子在运行期扩展 Java 类与实现 Java 接口，CGLib 封装了 asm，可以在运行期动态生成新的 class，和 JDK 动态代理相比较：JDK 创建代理有一个限制，就是只能为接口创建代理实例，而对于没有通过接口定义业务方法的类，则可以通过 CGLib 创建动态代理。
+
+#### 6.1.8.4. 实现原理
+
+```java
+@Aspect
+public class TransactionDemo {
+  @Pointcut(value="execution(* cn.hunkier.core.service.*.*.*(..))")
+  public void point(){
+    
+  }
+  
+  @Before(value="point")
+  public void before(){
+    System.out.println("transaction begin");
+  }
+  
+  @AfterReturning(value="point()")
+  public void after(){
+    System.out.println("transaction commit")
+  }
+  
+  @Around("point()")
+  public void around(ProceedingJoinPoint joinPoint) throws Throwable {
+    System.out.println("transaction begin");
+    joinPoint.proceed();
+    System.out.println("transaction commit");
+  }
+  
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 6.1.9. Spring MVC 原理
+
+Spring 的模型-视图-控制器 (MVC) 框架是围绕一个 DispatcherServlet 来设计的，这个 Servlet 会把请求分发到各个处理器，并支持可配置的处理器、视图渲染、本地化、时区与主题渲染等，甚至还能支持文件上传。
+
+
+
+
+
