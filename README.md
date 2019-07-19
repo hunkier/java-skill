@@ -3179,3 +3179,60 @@ Spring 的模型-视图-控制器 (MVC) 框架是围绕一个 DispatcherServlet 
 
 
 
+
+
+#### 6.1.9.1.  MVC 流程
+
+**Http 请求到 DispatcherServlet**
+
+​	(1) 客户端请求提交到 DispatcherServlet
+
+**HandlerMapping 寻找处理器**
+
+​	(2) 由 DispatcherServlet 控制器查询一个或多个 HanlderMapping，找到处理请求的 Controller。
+
+**调用处理器 Controller**
+
+​	(3) DispatcherServlet 将请求提交到 Controller。
+
+**Controller 调用业务逻辑处理。**
+
+​	(4) Controller 调用业务逻辑处理
+
+**返回 ModelAndView。**
+
+​	(5) Controller 处理完业务后，返回 ModelAndView。
+
+**DispatcherServlet 查询 ModelAndView**
+
+​	(6)、(7) 处理视图并返回模型：DispatcherServlet 查询一个或多个 ViewResoler 视图解析器，找到 ModelAndView 指定的视图。
+
+**ModelAndView 反馈浏览器 HTTP**
+
+​	(8) Http 响应：视图复制将结果显示到客户端。
+
+
+
+#### 6.1.9.2. MVC 常用注解
+
+
+
+
+
+
+
+
+
+### 6.1.10.  Spring Boot 原理
+
+Spring Boot 是由 Pivotal 团队提供的全新框架，其设计目的是用来简化性 Spring 应用的初始搭建及开发过程。该框架使用了特定的方式来进行配置，从而使开发人员不再需要定义样板化的配置。通过这种方式，Spring Boot 致力于在蓬勃发展的快速应用开发领域 (raped application development) 成为领导者。其特点如下：
+
+1. **创建独立的 Spring 应用程序**
+2. **嵌入式的 Tomcat，无需部署 WAR 文件**
+3. **简化 Maven 配置**
+4. **自动配置 Spring**
+5. **提供生产就绪型功能，如指标，健康检查和外部配置**
+6. **绝对没有代码生成和对 XML 没要要求配置**
+
+
+
