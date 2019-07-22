@@ -3236,3 +3236,134 @@ Spring Boot 是由 Pivotal 团队提供的全新框架，其设计目的是用�
 
 
 
+### 6.1.11.  JPA 原理
+
+#### 6.1.11.1.  事务
+
+事务是计算机应用中不可或缺的组件模型，它保证了用户操作的原子性 (Atomicity)、(Consisency)、(Isolation) 和持久性 (Durabilily)。
+
+#### 6.1.11.2.  本地事务
+
+紧密依赖于底层资源管理器 (例如数据库连接)， 事务处理局限在当前事务资源内。此种事务处理方式不存在对应应用服务器的依赖，因而部署灵活却无法支持多种数据源的分布式事务。在数据库连接中使用本地事务示例如下：
+
+```java
+public void transferAccount(){
+  Connection conn = null;
+  Statement stmt = null;
+  try {
+    conn = getDataSource().getConnectoin();
+    // 将自动提交设置为 false，若设置为 true 则数据库会把每一次数据更新认定为一个事务并自动提交
+    conn.setAutoCommit(false);
+    stmt = conn.createStatement();
+    // 将 A 账户中的金额减少 500
+    stmt.execute("update t_account set amount = amount - 500 where account_id = 'A'");
+    // 将 B 账户中的金额增加 500
+    stmt.execute("update t_account set amount = amount + 500 where account_id = 'B' ");
+    // 提交事务
+    conn.commit();
+    // 事务提交：转账的两步操作同时成功
+  } catch (SQLException sqle) {
+    // 发生异常，回滚在本事务中的操作
+    conn.rollback();
+    // 事务回滚：转账的两步操作完全撤销
+    stmt.close();
+    conn.close();
+  }
+}
+```
+
+#### 6.1.11.3. 分布式事务
+
+Java 事务编程接口 (JTA Java Transaction API) 和 Java 事务服务 (JTS；Java Transaction Service ) 为 J2EE 平台提供了分布式事务服务。分布式事务 (Distributed Transaction) 包括事务管理器 (Transaction Manager ) 和 一个或多个支持 XA 协议 的资源管理器 (Resourse Manager)。我们可以将资源管理器看做任意类型的持久化数据库存储；事务管理器承担着所有的事务参与单元的协调与控制。
+
+```java
+public void transferAccount() {
+  UserTransaction userTx = null ;
+  Connection connA = null; Statement stmtA = null;
+  Connection connB = null; Statement stmtB = null;
+  try{
+    // 获得 Transaction 管理对象
+    userTx = (UserTransactoin)getContext().lookup("java:comp/UserTransaction");
+    connA = getDataSourceA().getConnection(); // 从数据库 A 中取得数据库连接
+    connB = getDataSourceB().getConnection(); // 从数据库 B 中取得数据库连接
+    userTx.begin(); // 启动事务
+    stmtA = connA.createStatement(); // 将 A 账户中的金额减少 500
+    stmtA.execute("update t_account set amount = amount - 500 where account_id = 'A' ");
+    // 将 B 账号中金额增加 500
+    stmtB = connB.createStatement();
+    stmtB.execute("update t_account set amount = amount + 500 where account_id = 'B' ");
+    userTx.commit(); // 提交事务
+    // 事务提交：转账的两步操作同时成功 (数据库 A 和数据库 B 中的数据被同时更新)
+  } catch (SQLException sqle){
+    // 发生异常，回滚在本事务中的操控
+    userTx.rollback(); // 事务回滚：数据库 A 和数据库 B 中的数据更新被同时撤销
+  } catch (Execption ne) {}
+}
+```
+
+#### 6.1.11.4.  两阶段提交
+
+两阶段提交主要保证了分布式事务的原子性：即所有结点要么全做要么全不做，所谓的两个阶段是指：第一阶段：准备阶段；第二阶段：提交阶段。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. 准备阶段
+
+事务协调者 (事务管理器) 给每个参与者 (资源管理器) 发送 Prepare 消息，每个参与者要么直接返回失败 (如权限验证失败)，要么在本地执行事务，写本地的 redo 和 undo 日志，但不提交，到达一种 "万事俱备，只欠东风" 的状态。
+
+2. 提交阶段：
+
+如果协调者收到了参与者的失败消息或者超时，直接给每个参与者发送回滚 (Rollback) 消息；否则，发送提交 (Commit) 消息；参与者根据协调者的指令执行提交或者回滚操作，释放所有事务处理过程中使用的锁资源。(注意：必须在最后阶段释放资源)
+
+将提交分成两阶段进行的目的很明确，就是尽可能晚的提交事务，让事务在提交前尽可能地完成所有能完成的工作。
+
+
+
+
+
+### 6.1.12.  Mybatis 缓存
+
+Mybatis 中有一级缓存和二级缓存，默认情况下一级缓存是开启的，而且是不能关闭的。一级缓存是指 SqlSession 级别的缓存，但在同一个 SqlSessin 中进行相同的 SQL 语句查询时，第二次以后的查询不会从数据库查询，而是直接从缓存中获取，一级缓存最多缓存 1024 条 SQL。二级缓存是指可以跨 SqlSession 的缓存。是 mapper 级别的缓存，对于 mapper 级别的缓存不同的 sqlsession 是可以共享的。
+
+
+
+
+
+
+
+#### 6.1.12.1.  Mybatis 的一级缓存原理 (sqlsession 级别)
+
+第一次发出一个查询 sql，sql 查询结果写入 sqlsession 的一级缓存中，缓存使用的数据结构是一个 map。
+
+```sql
+key: MapperID + offset + limit + Sql + 所有的入参
+value: 用户信息
+```
+
+同一个 sqlsession 再次发出相同的 sql，就从缓存中取出数据。如果两次中间出现 commit 操作 (修改、添加、删除)，本 sqlsession 中的一级缓存区域全部清空，下次再去缓存中查询不到，所以要从数据库查询，从数据库查询到再写入缓存。
+
+#### 6.1.12.2. 二级缓存原理 (mapper 基本)
+
+二级缓存的范围是 mapper 级别 (mapper 同一个命名空间)，mapper 以命名空间为单位创建缓存数据结构，结构是 map。mybatis 的二级缓存是 通过 CacheExecutor 实现的。CacheExecutor 其实是 Executor 的代理对象。所有的查询操作，在 CacheExecutor 中都会先匹配缓存中是否存在，不存在则查询数据库。
+
+```sql
+key: MapperID + offset + limit + Sql + 所有的入参
+```
+
+具体使用需要配置：
+
+1. Mybatis 全局配置中启用二级缓存配置
+2. 在对应 Mapper.xml 中配置 cache 节点
+3. 在对应的 select 查询节点中添加 useCache=true
