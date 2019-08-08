@@ -4506,3 +4506,226 @@ ZAB 提交事务并不像 2PC 一样需要全部 Follower 都 ACK，只需要得
 
 Kafka 是一种高吞吐量、分布式、基于发布/订阅的消息系统，最初由 LinkedIn 公司开发，使用 Scala 语言编写，目前是 Apache 的开源项目。
 
+1. broker：Kafka 服务器，负责消息存储和转发
+2. topic：消息类别，Kafka 按照 topic 来分类消息
+3. partiton：topic 的分区，一个 topic 可以包含多个 partition， topic 消息保存在各个 partition 上
+4. offset：消息在日志中的位置，可以理解是消息在 partition 上的偏移量，也是代表消息的唯一序号
+5. Producer：消息生产者
+6. Consumer：消息消费者
+7. Consumer Group：消费者分组，每个 Consumer 必须属于一个 group
+8. Zookeeper：保存着集群 broker、topic、partition 等 meta 数据；另外，还负责 broker 故障发现，partition leader 选举，负载均衡等功能
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 12.1.2.  Kafka 数据存储设计
+
+#### 12.1.2.1.  partition 的数据文件 (offset，MessageSize，data)
+
+partitoin 中的每条 Message 包含了以下三个属性：offset，MessageSize，data，其中 offset 表示 Message 在这个 partition 中的偏移量，offset 不是该 Message 在 partition 数据文件中的实际存储位置，而是逻辑上一个值，它唯一确定了 partition 中的一条 Message，可以认为 offset 是 partition 中 Message 的 id；Message 的 id；MessageSize 表示消息内容 data 的大小；data 为 Message 的具体内容。
+
+#### 12.1.2.2. 数据文件分段 segment (顺序读写、分段命令、二分查找)
+
+partition 物理上有多个 segment 文件组成，每个 segment 大小相等，顺序读写。每个 segment 数据文件以该段中最小的 offset 命名，文件扩展名为 .log 。这样在查找指定的 offset 的 Message 的时候，用二分查找就可以定位到该 Message 在哪个 segment 数据文件中。
+
+#### 12.1.2.3. 数据文件索引 (分段索引、稀疏存储)
+
+Kafka 为每个分段后的数据文件建立了索引文件，文件名与数据文件的名字是一样的，只是文件扩展名为 .index 。index 文件中并没有为数据文件中的每条 Message 建立索引，而是采用稀疏存储方式，每隔一定字节的数据建立一条索引。这样避免了索引文件占用过多的空间，从而可以将索引文件保留在内存中。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 12.1.3.  生产者设计
+
+#### 12.1.3.1. 负责均衡 (partition 会均衡分布到不同的 broker 上)
+
+由于消息 topic 由多个 partition 组成，且 partition 会均衡分布到不同 broker 上，因此，为了有效利用 broker 集群的性能，提高消息的吞吐量，producer 可以通过随机或者 hash 等方式，将消息平均发送到多个 partition 上以实现负载均衡。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 12.1.3.2.  批量发送
+
+是提高消息吞吐量重要的方式，Producer 端可以在内存中合并多条消息后，以一次请求的方式发送批量的消息给 broker，从而大大减少 broker 存储消息的 IO 操作次数。但也一定程度上影响力消息的实时性，相当于以时延代价，换取更好的吞吐量。
+
+#### 12.1.3.3. 压缩 (GZIP 或 Snappy)
+
+Producer 端可以通过 GZIP 或 Snappy 格式对消息集合进行压缩。Producer 端进行压缩之后，在 Consumer 端进行解压。压缩的好处就是减少传输的数据量，减轻对网络传输的压力，在对在数据处理上，瓶颈往往体现在网络而不是 CPU (压缩和解压会耗掉部分 CPU 资源) 。
+
+### 12.1.1.  消费者设计
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 12.1.1.1. Consumer Group
+
+同一 Consumer Group 中的多个 Consumer 实例，不同消费端连同一个 partition ，等效于队列模式。partition 内消息是有序的，Consumer 通过 pull 方式消费消息。Kafka 不删除已消费的消息，对于 partition ，顺序读写磁盘数据，以时间复杂度 O(1) 方式 提供消息持久化能力。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 13. RabbitMQ
+
+### 13.1.1.  概念
+
+RabbitMQ 是一个由 Erlang 语言开发的 AMQP 的开源实现。
+
+AMQP：Advanced Message Queue，高级消息队列协议。它是应用层的一个开放标准，为面向消息的中间件设计，基于此协议的客户端与消息中间件可传递消息，并不受产品、开发语言等条件限制。
+
+RabbitMQ 最初起源于金融系统，用于分布式系统中存储转发消息，在易用性、扩展性、高可用性等方面表现不俗。具体特点包括：
+
+1. 可靠性 (Reliability)：RabbitMQ 使用一些机制来保证可靠性，如持久化、传输确认、发布确认。
+2. 灵活的路由 (Flexible Routing) ： 在消息进入队列之前，通过 Exchange 来路由消息的。对于典型的路由功能，RabbitMQ 已经提供了一些内置的 Exchange 来实现。针对更复杂的路由功能，RabbitMQ 已经提供了一些内置的 Exchange 来实现。针对更复杂的路由功能，可以将多个 Exchange 绑定在一起，也通过插件机制实现自己的 Exchange 。
+3. 消息集群 (Clustering) ：多个 RabbitMQ 服务器可以组成一个集群，形成一个逻辑 Broker。
+4. 高可用 (Highly Available Queues) ：队列可以在集群中的机器上进行镜像，使得在部分节点处问题的情况小队列仍然可用。
+5. 多种协议 (Multi-protocol) ：RabbitMQ 支持多种消息队列协议，比如 STOMP、MQTT 等等。
+6. 多语言客户端 (Many Clients) ：RabbitMQ 提供了一个易用的用户界面，使得用户可以监控和管理消息 Broker 的许多方面。
+7. 管理界面 (Management UI) ：RabbitMQ 提供了一个易用的用户界面，使用用户可以监控和管理消息 Broker 的许多方面。
+8. 跟踪机制 (Tracing) ：如果消息异常，RabbitMQ 提供了消息跟踪机制，使用者可以找出发生了什么。
+9. 插件机制 (Plugin System) ： RabbitMQ 提供了许多插件，来从多方面进行扩展，也可以编写自己的插件。
+
+
+
+
+
+### 13.1.2.  RabbitMQ 架构
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### 13.1.2.1.   Message 
+
+消息，消息是不具名的，它有消息头和消息体组成。消息体是不透明的，而消息头则由一系列的可选属性组成，这些属性包括 routing-key (路由键)、priority (相对于其他消息的优先权)、delivery-mode (指出该消息可能需要持久性存储) 等。
+
+#### 13.1.2.2. Publisher 
+
+1. 消息的生产者，也是一个向交换器发布消息的客户端应用程序。
+
+#### 13.1.2.3.  Exchange (将消息路由给队列)
+
+2. 交换器，用来接收生产者发送的消息并将这些消息路由给服务器的队列。
+
+#### 13.1.2.4.  Binding (消息队列和交换器之间的关联)
+
+3. 绑定，用于消息队列和交换器之间的关联。一个绑定就是基于路由键将交换器和消息队列连接起来的路由规则，所以可以将交换器理解成一个有绑定构成的路由器。
+
+#### 13.1.2.5.  Queue
+
+4. 消息队列，用来保存消息知道发送给消费者。它是消息的容器，也是消息的终点。一个消息可投入一个或多个队列。消息一直在队列里面，等待消费者连接到这个队列将其取走。
+
+
+
+
+
+
+
