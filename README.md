@@ -4992,3 +4992,66 @@ Hbase 是由 Client、Zookeeper、Master、HRegionServer、HDFS 等几个组建�
 
 MongonDB 是由 C++ 语言编写的，是一个基于分布式文件存储得开源数据库系统。在高负载的情况下，添加更多的节点，可以保证服务器性能。MongoDB 旨在为 WEB
 应用提供可扩展的高性能数据存储方案。
+
+MongoDB 将数据存储为一个文档，数据结构由键值 (key=> value) 对组成。MongoDB 文档类似于 JSON 对象。字段可以包含其他文档，数组及文档数组。
+
+```json
+{
+  name: "sue",
+  age: 26,
+  status: "A",
+  groups: ["news", "sports"]
+}
+```
+
+### 15.1.2.  特点
+
+* MongoDB 是一个面向文档存储得数据库，操作起来比较简单和容易。
+* 你可以在 MongoDB 记录中设置任何属性的索引 (如：FirstName="sameer", Address="8 gandhi Road") 来实现更快的排序。
+* 你可以通过本地或者网络创建数据镜像，这使得 MongoDB 有更强的扩展性。
+* 如果负载的增加 (需要更多的存储空间和更强的处理能力)，它可以分布在计算机网络中的其他节点上，这就是所谓的分片。
+* MongoDB 支持丰富的查询表达式。查询指令使用 JSON 形式的标记。可轻易查询文档中内嵌的对象及数组。
+* MongoDB 使用 update() 命令可以实现替换完成的文档 (数据) 或者一些指定的数据字段。
+* MongoDB 中的 Map/reduce 主要是用来对数据进行批量操作和聚合操作。
+* Map 和 Reduce。Map 函数调用 emit(key, value) 遍历集合中所有的记录，将 key 与 value 传给 Reduce 函数进行处理。
+* Map 函数和 Reduce 函数是使用 Javascript 编写，并可以通过 db.runCommand 或 mapreduce 命令来执行 MapReduce 操作。
+* GridFS 是 MongoDB 中的一个内置功能，可以用于存放大量小文件。
+* MongoDB 允许在服务端执行脚本，可以用 Javascript 编写某个函数，直接在服务端执行，也可以把函数的定义存储在服务端，下次直接调用即可。
+
+
+
+# 16. Cassandra
+
+### 16.1.1.  概念
+
+Apache Cassandra 是高度扩展，高性能的分布式 NoSQL 数据库。Cassandra 旨在处理许多商业服务器上的大量数据，提供高可用性而无需担心单点故障。
+
+Cassandra 具有能够处理大量数据的分布式架构。数据放置在具有多个复制因子的不同机器上，以获得高可用性，而无需担心单点故障。
+
+### 16.1.2.  数据模型
+
+Key Space (对应 SQL 数据库中的 database)
+
+1. 一个 Key Space 中可包含若干个 CF，如同 SQL 数据库中一个 database 可包含多个 table
+
+Key (对应 SQL 数据库中的主键)
+
+2. 在 Cassandra 中，每一行数据记录是以 key/value 的形式存储得，其中 key 是唯一标识。
+
+column (对应 SQL数据库中的列)
+
+3. Cassandra 中每个 key/value 对中的 value 又称为 column，它是一个三元组，即：name、value 和 timestamp，其中 name 需要是唯一的。
+
+super colmn (SQL 数据库不支持)
+
+4. cassandra 允许 key/value 中的 value 是一个 map (key/value_list) ，即某个 column 有多个子列。
+
+Standard Column Family (相对应 SQL 数据库中的 table)
+
+5. 每个 CF 由一系列 row 组成，每个 row 包含一个 key 以及其对应的若干 column。
+
+Super Column Family (SQL数据库不支持)
+
+6. 每个 SCF 由一系列 row 组成，每个 row 包含一个 key 以及其对应的若干 super column。
+
+### 16.1.3.  Cassandra 一致 Hash 和虚拟节点
