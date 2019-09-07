@@ -5962,3 +5962,123 @@ CAP 原则又称为 CAP 定理，指的是在一个分布式系统中，Consiste
 分区容忍性 (P)
 
 3. 以实际效果而言，分区相对通信的时限要求。系统如果不能再时限内达成数据一致性，就意味着发生了分区情况，必须就当前操作在 C 和 A 之间做出选择。
+
+
+
+# 20.  一致性算法
+
+### 20.1.1.  Paxos
+
+Paxos 算法解决的问题是一个分布式系统如何就某个值 （决议）达成一致。一个典型的场景是，在一个分布式数据库系统中，如果各个节点的初始状态一致，每个节点执行相同的操作序列，那么他们最后能得到一个一致的状态。为保证每个节点执行相同的命令序列，需要在每一条指令上执行一个 ”一致性算法“ 以保证每个节点看到的指令一致。zookeeper 使用的 zab 算法时该算法的一个实现。在 Paxos 算法中，有三种角色：Proposer，Acceptor，learners。
+
+**Paxos 三种角色：Proposer，Acceptot，Learners**
+
+**Proposer：**
+
+只要 Proposer 发的提案被半数以上 Acceptor 接受，Proposer 就认为该提案的 value 被选定了。
+
+**Acceptor：**
+
+只要 Acceptor 接受了某个提案，Acceptor 就认为该提案里的 value 被选定了。
+
+**Learner：**
+
+Acceptor 告诉 Learner 哪个 value 被锁定，Learner 就认为那个 value 被锁定。
+
+Paxos 算法分为两个阶段。具体如下：
+
+**阶段一 （准备 leader 确定）：**
+
+（a) Proposer 选择一个提案编号 N，然后半数以上的 Acceptor 发送编号为 N 的 Prepare 请求。
+
+（b) 如果一个 Acceptor 收到一个编号为 N 的 Prepare 请求，且 N 大于该 Acceptor 已经响应过的所有 Prepare 请求的编号，那么它就会将它已经接受过的编号最大的提案 （如果有的话） 作为响应反馈给 Proposer，同时该 Acceptor 承诺不再接受任何编号小于 N 的提案。
+
+**阶段二 （leader 确认）：**
+
+（a) 如果 Proposer 收到半数以上 Acceptor 对其发出的编号为 N 的 Prepare 请求的响应，那么它就会发送一个针对 [N, V] 提案的 Accept 请求给半数以上的 Acceptor。注意：V 就是收到的响应中编号最大的提案的 value，如果响应中不包含任何提案，那么 V 就由 Proposer 自己决定。
+
+（b) 如果 Acceptor 收到一个针对编号为 N 的提案的 Accept 请求，只要该 Acceptor 没有对编号大于 N 的 Prepare 请求做出过响应，它就接受该提案。
+
+### 20.1.2.  Zab
+
+ZAB (Zookeeper Atomic Broadcast，Zookeeper 原子消息广播协议) 协议包括两种基本的模式：崩溃恢复和消息广播
+
+1. 当整个服务框架在启动过程中，或是当 Leader 服务器出现网络中断崩溃退出与重启等异常情况时，ZAB 就会进入恢复模式并选举产生行的 Leader 服务器。
+2. 当选举产生了新的 Leader 服务器，同时集群中已经有过半的机器与该 Leader 服务器完成了状态同步之后，ZAB 协议就会退出崩溃恢复模式，进入消息广播模式。
+3. 当有新的服务器加入到集群中去，如果此时集群中已经存在一个 Leader 服务器在负责进行消息广播，那么新加入的服务器会自动进入数据恢复模式，找到 Leader 服务器，并与其进行数据同步，然后一起参与到消息广播流程中去。
+
+以上其实大致经历了三个步骤：
+
+1. 崩溃恢复：主要就是 Leader 选举过程
+2. 数据同步：Leader 服务器与其他赋权进行数据同步
+3. 消息广播：Leader 服务器将数据发送给其他服务器
+
+说明：zookeeper 章节对该协议有详细描述
+
+### 20.1.3.  Raft
+
+与 Paxos 不同，Raft 强调的是易懂 (Understandability) ，Raft 和 Paxos 一样只要保证 n/2 + 1 节点正常就能够提供服务；Raft 把算法流程分为三个子问题：选举 (Leader election)、日志复制 (Log replication)、安全性 (Safety) 三个子问题。
+
+#### 20.1.3.1.  角色
+
+Raft 把集群中的节点分为三种状态：Leader、Follower、Candidate，理所当然每种状态负责的任务也是不一样的，Raft 运行时提供服务的时候只存在 Leader 与 Follower 两种状态；
+
+**Leader （领导者-日志管理）**
+
+负责日志的同步管理，处理来自客户端的请求，与 Follower 保持着 heartBeat 的联系；
+
+**Follower （追随者-日志同步）**
+
+刚启动时所用节点为 Follower 状态，响应 Leader 的日志同求请求，响应 Candidate 的请求，把请求到 Follower 的事转发给 Leader；
+
+**Candidate （候选者-负责选票）**
+
+  负责选举投票，Raft 刚启动时由一个节点从 Follower 转为 Candidate 发起选举，选举出 Leader 后从 Candidate 转为 Leader 状态；
+
+#### 20.1.3.2.  Term （任期）
+
+在 Raft 中使用了一个可以理解为周期 （第几届、任期）的概念，用 Term 作为一个周期，每个 Term 都是一个连续递增的编号，每一轮选举都是一个 Term 周期，在一个 Term 中只能产生一个 Leader；当某节点收到的请求中 Term 比当前 Term 小时，则拒绝该请求。
+
+#### 20.1.3.3.  选举 （Election）
+
+选举定时器
+
+Raft 的选举有定时器来发送，每个节点的选举定时器时间都是不一样的，开始状态都为 Follower 某个节点定时器触发选举后 Term 递增，状态有 Follower 转为 Candidate，向其他节点发起 RequestVote RPC 请求，这时候有三种可能的情况发送：
+
+1. 该 RequestVote 请求接收到 n/2 + 1 (过半数) 个节点的投票，从 Candidate 转为 Leader，向其他节点发送 heartBeat 以保持 Leader 的正常运转。
+2. 在此期间如果收到其他节点发送过来的 AppendEntries RPC 请求，如该节点的 Term 大，则当前节点转为 Follower，否则保持 Candidate 拒绝该请求。
+3. Election timeout 发生则 Term 递增，重新发起选举
+
+   在一个 Term 期间每个节点只能投票一次，所以当有多个 Candidate 存在时就会出现每个 Candidate 发起的选举都存在接收到投票数都不过半的问题，这时每个 Candidate 都将 Term 递增、重启定时器并重新发起选举，由于每个节点中定时器的时候都是随机的，所以不会多次存在同时发起投票的问题。
+
+   在 Raft 中当接收到客户端的日志 (事务请求) 后把该日志追加到本地的 Log 中，然后通过 heartBeat 把该 Entry 同步给其他 Follower，Follower 接收到日志后记录日志然后向 Leader 发送 ACK，当 Leader 收到大多数 (n/2+1) Follower 的 ACK 信息后将该日志设置为已提交并追加到本地磁盘中，通知客户端并在下个 hearbeat 中 Leader 将通知所有的 Follower 将该日志存储在自己的本地磁盘中。
+
+#### 20.1.3.4. 安全性 (Safety)
+
+安全性是用于保证每个节点都执行相同的序列的安全机制，如当某个 Follower 在当前 Leader commit log 时变得不可用了，稍后可能该 Follower 又会被选举为 Leader，这时新 Leader 可能会用新的 Log 覆盖已 committed 的 Log，这就是导致节点执行不同序列；Safety 就是用于保证选举出来的 Leader 一定包含先前 committed Log 的机制；
+
+选举安全性 (Election Safety) ：每个 Term 只能选举出一个 Leader
+
+Leader 完整性 (Leader Completeness) ： 这里所说的完整性是指 Leader 日志的完整性，Raft 在选举阶段就使用 Term 的判断用于保证完整性：当请求投票的该 Candidate 的 Term 较大或 Term 相同 Index 更大则投票，该节点将容易变成 leader。
+
+#### 20.1.3.5.  raft 协议和 zab 协议区别
+
+相同点
+
+* 都采用 quorum 来确定整个系统的一致性，这个 quorum 一般是集群中半数以上的服务器，
+* zookeeper 里还提供了带权重的 quorum 实现
+* 都由 leader 来发起写操作
+* 都采用心跳检查存活性
+* leader election 都采用先到先得的投票方式
+
+不同点
+
+* zab 用的是 epoch 和 count 的组合来唯一表示一个值，而 raft 用的是 term 和 index
+* zab 的 follower 在投票给一个 leader 之前必须和 leader 的日志达成一致，而 raft 的follower 则简单地说是谁的 term 高就投票给谁
+* raft 协议的心跳是从 leader 到 follower ，而 zab 协议相反
+* raft 协议数据只有单向的从 leader 到 follower (成为 leader 的条件之一就是拥有最新的 log)，
+
+而 zab 协议在 discovery 阶段，一个 prospective leader 需要将自己的 log 更新为 quorum 里面最新的 log，然后才好在 synchronization 阶段将 quorum 里的其他机器的 log 都同步到一致
+
+
+
